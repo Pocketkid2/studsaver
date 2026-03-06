@@ -146,6 +146,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <td class="item-description"></td>
                     <td class="item-design-id"></td>
                     <td class="item-price"></td>
+                    <td class="item-lego-price"></td>
                 `;
                 cartBody.appendChild(tr);
 
@@ -177,6 +178,30 @@ document.addEventListener('DOMContentLoaded', () => {
                                 isEmpty = false;
                             }
                         }
+                        
+                        const legoPriceTd = tr.querySelector('.item-lego-price');
+                        if (!isEmpty && data && data.itemType === 'P') {
+                            const btn = document.createElement('button');
+                            btn.textContent = 'Search';
+                            btn.className = 'search-lego-price-btn';
+                            btn.style.padding = '4px 8px';
+                            btn.style.cursor = 'pointer';
+                            btn.onclick = async () => {
+                                btn.textContent = '...';
+                                btn.disabled = true;
+                                try {
+                                    const elIds = await searchElementIds(data.itemNo, data.colorName);
+                                    legoPriceTd.textContent = elIds.length > 0 ? elIds.join(', ') : 'None';
+                                } catch (e) {
+                                    console.error('Error fetching element IDs', e);
+                                    legoPriceTd.textContent = 'Error';
+                                }
+                            };
+                            legoPriceTd.appendChild(btn);
+                        } else {
+                            legoPriceTd.textContent = 'N/A';
+                        }
+                        
                         if (isEmpty) {
                             console.warn('Empty row data retrieved for lot_id:', item.lot_id, 'store_id:', item.store_id, 'Response:', data);
                             issuesCount++;
@@ -205,5 +230,53 @@ document.addEventListener('DOMContentLoaded', () => {
         const div = document.createElement('div');
         div.innerText = str;
         return div.innerHTML;
+    }
+
+    async function searchElementIds(designId, targetColorName) {
+        if (!targetColorName) return [];
+        
+        try {
+            const bricklinkUrl = `https://www.bricklink.com/catalogColors.asp?itemType=P&itemNo=${designId}`;
+            const url = `https://corsproxy.io/?${encodeURIComponent(bricklinkUrl)}`;
+            const response = await fetch(url);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            const html = await response.text();
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            
+            const tables = doc.querySelectorAll('center > table');
+            let colorTable = null;
+            for (let i = 0; i < tables.length; i++) {
+                const table = tables[i];
+                const prev = table.previousElementSibling;
+                if (prev && prev.tagName.toLowerCase() === 'p') {
+                    colorTable = table;
+                    break;
+                }
+            }
+            
+            if (!colorTable) return [];
+            
+            const elementIds = [];
+            const rows = colorTable.querySelectorAll('tr');
+            for (let i = 0; i < rows.length; i++) {
+                const data = rows[i].querySelectorAll('td');
+                if (data.length < 5) continue;
+                
+                const colorName = data[3].textContent.trim().replace(/\u00A0/g, '');
+                if (colorName === targetColorName) {
+                    const elementId = data[4].textContent.trim().replace(/\u00A0/g, '');
+                    if (elementId && !elementIds.includes(elementId)) {
+                        elementIds.push(elementId);
+                    }
+                }
+            }
+            return elementIds;
+        } catch (err) {
+            console.error(err);
+            throw err;
+        }
     }
 });
