@@ -124,8 +124,31 @@ document.addEventListener('DOMContentLoaded', () => {
                     <td>${escapeHTML(item.store_id)}</td>
                     <td><code style="background: rgba(0,0,0,0.2)">${escapeHTML(item.lot_id)}</code></td>
                     <td>${escapeHTML(item.quantity)}</td>
+                    <td class="item-type"></td>
+                    <td class="item-condition"></td>
+                    <td class="item-color"></td>
+                    <td class="item-description"></td>
+                    <td class="item-design-id"></td>
+                    <td class="item-price"></td>
                 `;
                 cartBody.appendChild(tr);
+
+                // Fetch extra details
+                fetch(`https://store.bricklink.com/ajax/clone/store/item.ajax?invID=${encodeURIComponent(item.lot_id)}&sid=${encodeURIComponent(item.store_id)}&wantedMoreArrayID=`)
+                    .then(res => res.json())
+                    .then(data => {
+                        if(data) {
+                            tr.querySelector('.item-type').textContent = data.itemType || '';
+                            tr.querySelector('.item-condition').textContent = data.invNew || '';
+                            if (data.colorName !== undefined) {
+                                tr.querySelector('.item-color').textContent = data.colorName;
+                            }
+                            tr.querySelector('.item-description').textContent = data.itemName || '';
+                            tr.querySelector('.item-design-id').textContent = data.itemNo || '';
+                            tr.querySelector('.item-price').textContent = data.nativePrice || '';
+                        }
+                    })
+                    .catch(err => console.error('Error fetching item details:', err));
             });
         }
         
