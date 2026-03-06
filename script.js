@@ -4,6 +4,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const browseBtn = document.getElementById('browse-btn');
     const tableContainer = document.getElementById('table-container');
     const cartBody = document.getElementById('cart-body');
+    const statsContainer = document.getElementById('stats-container');
+    const statItems = document.getElementById('stat-items');
+    const statStores = document.getElementById('stat-stores');
+    const statParts = document.getElementById('stat-parts');
 
     // Make clicking the upload zone trigger the file input
     uploadZone.addEventListener('click', () => {
@@ -95,6 +99,14 @@ document.addEventListener('DOMContentLoaded', () => {
     function displayItems(items) {
         cartBody.innerHTML = '';
         
+        const numItems = items.length;
+        const uniqueStores = new Set(items.map(i => i.store_id)).size;
+        const totalParts = items.reduce((sum, i) => sum + (parseInt(i.quantity) || 0), 0);
+        
+        statItems.textContent = numItems;
+        statStores.textContent = uniqueStores;
+        statParts.textContent = totalParts;
+        
         if (items.length === 0) {
             const tr = document.createElement('tr');
             tr.innerHTML = `<td colspan="4" style="text-align: center; color: var(--text-muted); padding: 3rem;">No items found in the cart.</td>`;
@@ -118,6 +130,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         
         tableContainer.style.display = 'block';
+        statsContainer.style.display = 'grid';
         tableContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
