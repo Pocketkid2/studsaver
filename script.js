@@ -5,9 +5,23 @@ document.addEventListener('DOMContentLoaded', () => {
     const tableContainer = document.getElementById('table-container');
     const cartBody = document.getElementById('cart-body');
     const statsContainer = document.getElementById('stats-container');
+    const filterContainer = document.getElementById('filter-container');
+    const debugModeToggle = document.getElementById('debug-mode-toggle');
+    const filterPartsOnlyToggle = document.getElementById('filter-parts-only');
     const statItems = document.getElementById('stat-items');
     const statStores = document.getElementById('stat-stores');
     const statParts = document.getElementById('stat-parts');
+    const statIssues = document.getElementById('stat-issues');
+
+    // Handle debug mode toggle
+    debugModeToggle.addEventListener('change', (e) => {
+        document.body.classList.toggle('debug-mode', e.target.checked);
+    });
+
+    // Handle parts only toggle
+    filterPartsOnlyToggle.addEventListener('change', (e) => {
+        document.body.classList.toggle('filter-parts-only', e.target.checked);
+    });
 
     // Make clicking the upload zone trigger the file input
     uploadZone.addEventListener('click', () => {
@@ -99,6 +113,9 @@ document.addEventListener('DOMContentLoaded', () => {
     function displayItems(items) {
         cartBody.innerHTML = '';
         
+        let issuesCount = 0;
+        statIssues.textContent = '0';
+        
         const numItems = items.length;
         const uniqueStores = new Set(items.map(i => i.store_id)).size;
         const totalParts = items.reduce((sum, i) => sum + (parseInt(i.quantity) || 0), 0);
@@ -120,9 +137,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 // Escape HTML to prevent XSS
                 tr.innerHTML = `
-                    <td><strong>${escapeHTML(item.prefix)}</strong></td>
-                    <td>${escapeHTML(item.store_id)}</td>
-                    <td><code style="background: rgba(0,0,0,0.2)">${escapeHTML(item.lot_id)}</code></td>
+                    <td class="col-debug">${escapeHTML(item.store_id)}</td>
+                    <td class="col-debug"><code style="background: rgba(0,0,0,0.2)">${escapeHTML(item.lot_id)}</code></td>
                     <td>${escapeHTML(item.quantity)}</td>
                     <td class="item-type"></td>
                     <td class="item-condition"></td>
@@ -135,25 +151,53 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 // Fetch extra details
                 fetch(`https://store.bricklink.com/ajax/clone/store/item.ajax?invID=${encodeURIComponent(item.lot_id)}&sid=${encodeURIComponent(item.store_id)}&wantedMoreArrayID=`)
-                    .then(res => res.json())
+                    .then(res => {
+                        if (!res.ok) {
+                            throw new Error(`HTTP error! status: ${res.status}`);
+                        }
+                        return res.json();
+                    })
                     .then(data => {
+                        let isEmpty = true;
                         if(data) {
-                            tr.querySelector('.item-type').textContent = data.itemType || '';
-                            tr.querySelector('.item-condition').textContent = data.invNew || '';
+                            tr.setAttribute('data-item-type', data.itemType || '');
+                            const typeMap = { 'P': 'Part', 'M': 'Minifig', 'S': 'Set', 'I': 'Instruction' };
+                            const condMap = { 'U': 'Used', 'N': 'New' };
+                            tr.querySelector('.item-type').textContent = typeMap[data.itemType] || data.itemType || '';
+                            tr.querySelector('.item-condition').textContent = condMap[data.invNew] || data.invNew || '';
                             if (data.colorName !== undefined) {
                                 tr.querySelector('.item-color').textContent = data.colorName;
                             }
                             tr.querySelector('.item-description').textContent = data.itemName || '';
                             tr.querySelector('.item-design-id').textContent = data.itemNo || '';
                             tr.querySelector('.item-price').textContent = data.nativePrice || '';
+                            
+                            // Check if the data actually contained item info
+                            if (data.itemType || data.itemName || data.itemNo) {
+                                isEmpty = false;
+                            }
+                        }
+                        if (isEmpty) {
+                            console.warn('Empty row data retrieved for lot_id:', item.lot_id, 'store_id:', item.store_id, 'Response:', data);
+                            issuesCount++;
+                            statIssues.textContent = issuesCount;
+                            tr.classList.add('row-error');
+                            tr.querySelector('.item-description').innerHTML = '<em>This inventory item is no longer available</em>';
                         }
                     })
-                    .catch(err => console.error('Error fetching item details:', err));
+                    .catch(err => {
+                        console.error(`Error fetching item details for lot_id: ${item.lot_id}, store_id: ${item.store_id}`, err);
+                        issuesCount++;
+                        statIssues.textContent = issuesCount;
+                        tr.classList.add('row-error');
+                        tr.querySelector('.item-description').innerHTML = '<em>This inventory item is no longer available</em>';
+                    });
             });
         }
         
         tableContainer.style.display = 'block';
         statsContainer.style.display = 'grid';
+        filterContainer.style.display = 'flex';
         tableContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 

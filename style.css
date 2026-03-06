@@ -44,7 +44,7 @@ main {
     gap: 2rem;
 }
 
-header, .upload-zone, .stats-container {
+header, .upload-zone, .stats-container, .filter-container {
     width: 100%;
     max-width: 900px;
 }
@@ -188,6 +188,14 @@ tr:hover td {
     background-color: var(--surface-hover);
 }
 
+tr.row-error td {
+    background-color: rgba(239, 68, 68, 0.2);
+}
+
+tr.row-error:hover td {
+    background-color: rgba(239, 68, 68, 0.3);
+}
+
 @keyframes fadeIn {
     from { opacity: 0; }
     to { opacity: 1; }
@@ -205,7 +213,7 @@ tr:hover td {
 
 .stats-container {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(4, 1fr);
     gap: 1.5rem;
     animation: slideUp 0.5s ease;
 }
@@ -238,4 +246,45 @@ tr:hover td {
     background: linear-gradient(to right, #818cf8, #c084fc);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
+}
+
+.filter-container {
+    background-color: var(--surface);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(51, 65, 85, 0.5);
+    border-radius: 0.5rem;
+    padding: 1rem 1.5rem;
+    display: flex;
+    gap: 1.5rem;
+    align-items: center;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
+    animation: slideUp 0.5s ease;
+}
+
+.filter-option {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    font-size: 0.95rem;
+    user-select: none;
+}
+
+.filter-option input[type="checkbox"] {
+    cursor: pointer;
+}
+
+/* Debug mode toggle */
+th.col-debug, td.col-debug {
+    display: none;
+}
+
+body.debug-mode th.col-debug, 
+body.debug-mode td.col-debug {
+    display: table-cell;
+}
+
+/* Filter Parts Only toggle */
+body.filter-parts-only #cart-body tr:not([data-item-type="P"]) {
+    display: none !important;
 }

@@ -38,15 +38,29 @@
                     <div class="stat-value" id="stat-parts">0</div>
                     <div class="stat-label">Total Parts</div>
                 </div>
+                <div class="stat-box" id="stat-box-issues">
+                    <div class="stat-value" id="stat-issues" style="color: #ef4444; background: none; -webkit-text-fill-color: initial;">0</div>
+                    <div class="stat-label">Issues</div>
+                </div>
+            </div>
+
+            <div class="filter-container" id="filter-container" style="display: none;">
+                <label class="filter-option">
+                    <input type="checkbox" id="debug-mode-toggle">
+                    Debug mode
+                </label>
+                <label class="filter-option">
+                    <input type="checkbox" id="filter-parts-only">
+                    Show Parts only
+                </label>
             </div>
 
             <div class="table-container" id="table-container" style="display: none;">
                 <table id="cart-table">
                     <thead>
                         <tr>
-                            <th>Prefix</th>
-                            <th>Store ID</th>
-                            <th>Lot ID</th>
+                            <th class="col-debug">Store ID</th>
+                            <th class="col-debug">Lot ID</th>
                             <th>Quantity</th>
                             <th>Type</th>
                             <th>Condition</th>
