@@ -23,6 +23,24 @@ document.addEventListener('DOMContentLoaded', () => {
         document.body.classList.toggle('filter-parts-only', e.target.checked);
     });
 
+    const getAllLegoPricesBtn = document.getElementById('get-all-lego-prices-btn');
+    if (getAllLegoPricesBtn) {
+        getAllLegoPricesBtn.addEventListener('click', async () => {
+            const buttons = document.querySelectorAll('.search-lego-price-btn');
+            getAllLegoPricesBtn.disabled = true;
+            getAllLegoPricesBtn.textContent = 'Fetching...';
+            for (const btn of buttons) {
+                // If it's already disabled, it means we clicked it or it's currently fetching
+                if (!btn.disabled && btn.fetchLegoPrice) {
+                    await btn.fetchLegoPrice();
+                    // Small delay to prevent rate limiting
+                    await new Promise(r => setTimeout(r, 600));
+                }
+            }
+            getAllLegoPricesBtn.textContent = 'Done!';
+        });
+    }
+
     // Make clicking the upload zone trigger the file input
     uploadZone.addEventListener('click', () => {
         fileInput.click();
@@ -184,19 +202,43 @@ document.addEventListener('DOMContentLoaded', () => {
                             const btn = document.createElement('button');
                             btn.textContent = 'Search';
                             btn.className = 'search-lego-price-btn';
-                            btn.style.padding = '4px 8px';
-                            btn.style.cursor = 'pointer';
-                            btn.onclick = async () => {
+                            btn.fetchLegoPrice = async () => {
                                 btn.textContent = '...';
                                 btn.disabled = true;
                                 try {
                                     const elIds = await searchElementIds(data.itemNo, data.colorName);
-                                    legoPriceTd.textContent = elIds.length > 0 ? elIds.join(', ') : 'None';
+                                    if (elIds.length > 0) {
+                                        const finalResults = [];
+                                        for (const elId of elIds) {
+                                            try {
+                                                const res = await getLegoStoreResult(elId);
+                                                if (res) finalResults.push(res);
+                                            } catch (e) {
+                                                console.error('Error fetching lego store result for', elId, e);
+                                            }
+                                        }
+                                        if (finalResults.length === 0) {
+                                            legoPriceTd.textContent = 'Not Available';
+                                        } else {
+                                            legoPriceTd.innerHTML = finalResults.map(res => {
+                                                const formattedPrice = res.price?.formattedAmount || 'N/A';
+                                                let channelStr = 'XX';
+                                                if (res.deliveryChannel === 'pab') channelStr = 'BS';
+                                                else if (res.deliveryChannel === 'bap') channelStr = 'S';
+                                                const elementIdStr = escapeHTML(String(res.id));
+                                                const link = `<a href="https://www.lego.com/en-us/pick-and-build/pick-a-brick?query=${elementIdStr}" target="_blank" style="color: #60a5fa; text-decoration: none;">${elementIdStr}</a>`;
+                                                return `${link} - ${escapeHTML(String(formattedPrice))} - ${channelStr}`;
+                                            }).join('<br>');
+                                        }
+                                    } else {
+                                        legoPriceTd.textContent = 'None';
+                                    }
                                 } catch (e) {
-                                    console.error('Error fetching element IDs', e);
+                                    console.error('Error', e);
                                     legoPriceTd.textContent = 'Error';
                                 }
                             };
+                            btn.onclick = btn.fetchLegoPrice;
                             legoPriceTd.appendChild(btn);
                         } else {
                             legoPriceTd.textContent = 'N/A';
@@ -274,6 +316,62 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
             return elementIds;
+        } catch (err) {
+            console.error(err);
+            throw err;
+        }
+    }
+
+    const LEGO_QUERY = `
+query PickABrickQuery($input: ElementQueryInput!) {
+  searchElements(input: $input) {
+    results {
+      ...ElementLeaf
+    }
+    total
+    count
+  }
+}
+fragment ElementLeaf on SearchResultElement {
+  id
+  maxOrderQuantity
+  deliveryChannel
+  price {
+    formattedAmount
+    currencyCode
+  }
+}
+`;
+
+    async function getLegoStoreResult(elementId) {
+        const url = 'https://corsproxy.io/?' + encodeURIComponent('https://www.lego.com/api/graphql/PickABrickQuery');
+        const jsonBody = {
+            operationName: "PickABrickQuery",
+            variables: { input: { perPage: 10, query: String(elementId) } },
+            query: LEGO_QUERY
+        };
+        
+        try {
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(jsonBody)
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const responseJson = await response.json();
+            const results = responseJson.data?.searchElements?.results || [];
+            if (results.length < 1) {
+                console.warn(`Did not receive result for element ID: ${elementId}`);
+                return null;
+            }
+            console.log(`Received ${results.length} results for element ID: ${elementId}, returning the first one.`);
+            return results[0];
         } catch (err) {
             console.error(err);
             throw err;
