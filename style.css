@@ -213,7 +213,7 @@ tr.row-error:hover td {
 
 .stats-container {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(5, 1fr);
     gap: 1.5rem;
     animation: slideUp 0.5s ease;
 }
@@ -342,4 +342,12 @@ body.filter-parts-only #cart-body tr:not([data-item-type="P"]) {
 .search-lego-price-btn:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+}
+
+tr.row-cheaper td {
+    background-color: rgba(34, 197, 94, 0.2);
+}
+
+tr.row-cheaper:hover td {
+    background-color: rgba(34, 197, 94, 0.3);
 }

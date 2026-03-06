@@ -12,6 +12,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const statStores = document.getElementById('stat-stores');
     const statParts = document.getElementById('stat-parts');
     const statIssues = document.getElementById('stat-issues');
+    const statRecommendations = document.getElementById('stat-recommendations');
+    
+    let recommendationsCount = 0;
 
     // Handle debug mode toggle
     debugModeToggle.addEventListener('change', (e) => {
@@ -133,6 +136,8 @@ document.addEventListener('DOMContentLoaded', () => {
         
         let issuesCount = 0;
         statIssues.textContent = '0';
+        recommendationsCount = 0;
+        statRecommendations.textContent = '0';
         
         const numItems = items.length;
         const uniqueStores = new Set(items.map(i => i.store_id)).size;
@@ -220,8 +225,15 @@ document.addEventListener('DOMContentLoaded', () => {
                                         if (finalResults.length === 0) {
                                             legoPriceTd.textContent = 'Not Available';
                                         } else {
+                                            let lowestLegoPrice = Infinity;
                                             legoPriceTd.innerHTML = finalResults.map(res => {
                                                 const formattedPrice = res.price?.formattedAmount || 'N/A';
+                                                
+                                                const parsedPrice = extractPrice(formattedPrice);
+                                                if (parsedPrice !== null && parsedPrice < lowestLegoPrice) {
+                                                    lowestLegoPrice = parsedPrice;
+                                                }
+
                                                 let channelStr = 'XX';
                                                 if (res.deliveryChannel === 'pab') channelStr = 'BS';
                                                 else if (res.deliveryChannel === 'bap') channelStr = 'S';
@@ -229,6 +241,18 @@ document.addEventListener('DOMContentLoaded', () => {
                                                 const link = `<a href="https://www.lego.com/en-us/pick-and-build/pick-a-brick?query=${elementIdStr}" target="_blank" style="color: #60a5fa; text-decoration: none;">${elementIdStr}</a>`;
                                                 return `${link} - ${escapeHTML(String(formattedPrice))} - ${channelStr}`;
                                             }).join('<br>');
+
+                                            // Compare and highlight if cheaper
+                                            const pricePerStr = tr.querySelector('.item-price').textContent;
+                                            const pricePerFloat = extractPrice(pricePerStr);
+                                            
+                                            if (lowestLegoPrice !== Infinity && pricePerFloat !== null && lowestLegoPrice < pricePerFloat) {
+                                                if (!tr.classList.contains('row-cheaper')) {
+                                                    tr.classList.add('row-cheaper');
+                                                    recommendationsCount++;
+                                                    statRecommendations.textContent = recommendationsCount;
+                                                }
+                                            }
                                         }
                                     } else {
                                         legoPriceTd.textContent = 'None';
@@ -272,6 +296,20 @@ document.addEventListener('DOMContentLoaded', () => {
         const div = document.createElement('div');
         div.innerText = str;
         return div.innerHTML;
+    }
+
+    function extractPrice(str) {
+        if (!str) return null;
+        const match = String(str).match(/\d+\.\d+/);
+        if (match) {
+            return parseFloat(match[0]);
+        }
+        // Fallback for integer prices
+        const intMatch = String(str).match(/\d+/);
+        if (intMatch) {
+            return parseFloat(intMatch[0]);
+        }
+        return null;
     }
 
     async function searchElementIds(designId, targetColorName) {
