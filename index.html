@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BrickLink Cart Viewer</title>
+    <meta name="description" content="View contents of a BrickLink .cart file offline in your browser">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>BrickLink Cart Viewer</h1>
+            <p>Upload your <code>.cart</code> file to view its contents.</p>
+        </header>
+
+        <main>
+            <div class="upload-zone" id="upload-zone">
+                <input type="file" id="file-input" accept=".cart" hidden>
+                <div class="upload-content">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="upload-icon"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                    <h3>Drag & Drop your .cart file here</h3>
+                    <p>or <button type="button" id="browse-btn">Browse Files</button></p>
+                </div>
+            </div>
+
+            <div class="table-container" id="table-container" style="display: none;">
+                <table id="cart-table">
+                    <thead>
+                        <tr>
+                            <th>Prefix</th>
+                            <th>Store ID</th>
+                            <th>Lot ID</th>
+                            <th>Quantity</th>
+                        </tr>
+                    </thead>
+                    <tbody id="cart-body">
+                        <!-- Rows will be populated here -->
+                    </tbody>
+                </table>
+            </div>
+        </main>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
