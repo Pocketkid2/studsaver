@@ -14,9 +14,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const statIssues = document.getElementById('stat-issues');
     const statRecommendations = document.getElementById('stat-recommendations');
     
-    let recommendationsCount = 0;
-
-    // Handle debug mode toggle
+    let recommendationsBsCount = 0;
+    let recommendationsSCount = 0;
+    
+    function updateRecommendationsCount() {
+        const total = recommendationsBsCount + recommendationsSCount;
+        // If 0, just show 0 to be simple, otherwise show 20 (16/4)
+        if (total === 0) {
+            statRecommendations.textContent = '0';
+        } else {
+            statRecommendations.textContent = `${total} (${recommendationsBsCount}/${recommendationsSCount})`;
+        }
+    }    // Handle debug mode toggle
     debugModeToggle.addEventListener('change', (e) => {
         document.body.classList.toggle('debug-mode', e.target.checked);
     });
@@ -255,8 +264,9 @@ document.addEventListener('DOMContentLoaded', () => {
         
         let issuesCount = 0;
         statIssues.textContent = '0';
-        recommendationsCount = 0;
-        statRecommendations.textContent = '0';
+        recommendationsBsCount = 0;
+        recommendationsSCount = 0;
+        updateRecommendationsCount();
         
         const numItems = items.length;
         const uniqueStores = new Set(items.map(i => i.store_id)).size;
@@ -371,8 +381,9 @@ document.addEventListener('DOMContentLoaded', () => {
                                                 tr.setAttribute('data-cheapest-channel', res.deliveryChannel || '');
                                                 if (!tr.classList.contains('row-cheaper')) {
                                                     tr.classList.add('row-cheaper');
-                                                    recommendationsCount++;
-                                                    statRecommendations.textContent = recommendationsCount;
+                                                    if (res.deliveryChannel === 'pab') recommendationsBsCount++;
+                                                    else recommendationsSCount++;
+                                                    updateRecommendationsCount();
                                                 }
                                             }
                                         } else {
@@ -421,6 +432,8 @@ document.addEventListener('DOMContentLoaded', () => {
                                                         statIssues.textContent = issuesCount;
                                                     }
                                                     
+                                                    const prevChannel = tr.getAttribute('data-cheapest-channel');
+                                                    
                                                     tr.setAttribute('data-cheapest-element-id', res.id);
                                                     tr.setAttribute('data-cheapest-channel', res.deliveryChannel || '');
                                                     
@@ -428,15 +441,27 @@ document.addEventListener('DOMContentLoaded', () => {
                                                         if (!isCurrentlyCheaper) {
                                                             isCurrentlyCheaper = true;
                                                             tr.classList.add('row-cheaper');
-                                                            recommendationsCount++;
-                                                            statRecommendations.textContent = recommendationsCount;
+                                                            if (res.deliveryChannel === 'pab') recommendationsBsCount++;
+                                                            else recommendationsSCount++;
+                                                            updateRecommendationsCount();
+                                                        } else {
+                                                            // Handle switching between two cheaper options that are different channels
+                                                            if (prevChannel !== res.deliveryChannel) {
+                                                                if (prevChannel === 'pab') recommendationsBsCount--;
+                                                                else if (prevChannel) recommendationsSCount--;
+                                                                
+                                                                if (res.deliveryChannel === 'pab') recommendationsBsCount++;
+                                                                else recommendationsSCount++;
+                                                                updateRecommendationsCount();
+                                                            }
                                                         }
                                                     } else {
                                                         if (isCurrentlyCheaper) {
                                                             isCurrentlyCheaper = false;
                                                             tr.classList.remove('row-cheaper');
-                                                            recommendationsCount--;
-                                                            statRecommendations.textContent = recommendationsCount;
+                                                            if (prevChannel === 'pab') recommendationsBsCount--;
+                                                            else if (prevChannel) recommendationsSCount--;
+                                                            updateRecommendationsCount();
                                                         }
                                                     }
                                                 });
