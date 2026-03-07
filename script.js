@@ -44,6 +44,44 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    const downloadCsvBtn = document.getElementById('download-csv-btn');
+    if (downloadCsvBtn) {
+        downloadCsvBtn.addEventListener('click', () => {
+            const cheaperRows = document.querySelectorAll('tr.row-cheaper');
+            const partsMap = {};
+
+            for (const row of cheaperRows) {
+                const elementId = row.getAttribute('data-cheapest-element-id');
+                // The quantity is the 3rd cell (index 2)
+                const quantityText = row.children[2].textContent;
+                const quantity = parseInt(quantityText) || 0;
+                
+                if (elementId && quantity > 0) {
+                    if (partsMap[elementId]) {
+                        partsMap[elementId] += quantity;
+                    } else {
+                        partsMap[elementId] = quantity;
+                    }
+                }
+            }
+
+            let csvContent = "elementId,quantity\r\n";
+            for (const [elId, qty] of Object.entries(partsMap)) {
+                csvContent += `${elId},${qty}\r\n`;
+            }
+
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.setAttribute('href', url);
+            a.setAttribute('download', 'pick_a_brick_recommendations.csv');
+            a.style.display = 'none';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        });
+    }
+
     // Make clicking the upload zone trigger the file input
     uploadZone.addEventListener('click', () => {
         fileInput.click();
@@ -226,12 +264,14 @@ document.addEventListener('DOMContentLoaded', () => {
                                             legoPriceTd.textContent = 'Not Available';
                                         } else {
                                             let lowestLegoPrice = Infinity;
+                                            let cheapestElementId = null;
                                             legoPriceTd.innerHTML = finalResults.map(res => {
                                                 const formattedPrice = res.price?.formattedAmount || 'N/A';
                                                 
                                                 const parsedPrice = extractPrice(formattedPrice);
                                                 if (parsedPrice !== null && parsedPrice < lowestLegoPrice) {
                                                     lowestLegoPrice = parsedPrice;
+                                                    cheapestElementId = res.id;
                                                 }
 
                                                 let channelStr = 'XX';
@@ -247,6 +287,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                             const pricePerFloat = extractPrice(pricePerStr);
                                             
                                             if (lowestLegoPrice !== Infinity && pricePerFloat !== null && lowestLegoPrice < pricePerFloat) {
+                                                tr.setAttribute('data-cheapest-element-id', cheapestElementId);
                                                 if (!tr.classList.contains('row-cheaper')) {
                                                     tr.classList.add('row-cheaper');
                                                     recommendationsCount++;
