@@ -82,6 +82,42 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    const downloadCartBtn = document.getElementById('download-cart-btn');
+    if (downloadCartBtn) {
+        downloadCartBtn.addEventListener('click', () => {
+            const nonCheaperRows = document.querySelectorAll('#cart-body tr:not(.row-cheaper)');
+            const records = [];
+            for (const row of nonCheaperRows) {
+                if (!row.hasAttribute('data-prefix')) continue;
+                
+                const prefix = row.getAttribute('data-prefix');
+                const storeId = row.getAttribute('data-store-id');
+                const lotId = row.getAttribute('data-lot-id');
+                const quantity = row.getAttribute('data-quantity');
+                
+                records.push(`${prefix}:${storeId}:${lotId}:${quantity}`);
+            }
+            
+            const asciiData = records.join('\n');
+            let hexString = '';
+            for (let i = 0; i < asciiData.length; i++) {
+                let hex = asciiData.charCodeAt(i).toString(16).toUpperCase();
+                if (hex.length === 1) hex = '0' + hex;
+                hexString += hex;
+            }
+            
+            const blob = new Blob([hexString], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.setAttribute('href', url);
+            a.setAttribute('download', 'filtered_cart.cart');
+            a.style.display = 'none';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        });
+    }
+
     // Make clicking the upload zone trigger the file input
     uploadZone.addEventListener('click', () => {
         fileInput.click();
@@ -192,6 +228,13 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             items.forEach((item, index) => {
                 const tr = document.createElement('tr');
+                
+                // Save original cart data to attributes for re-export
+                tr.setAttribute('data-prefix', item.prefix || '');
+                tr.setAttribute('data-store-id', item.store_id || '');
+                tr.setAttribute('data-lot-id', item.lot_id || '');
+                tr.setAttribute('data-quantity', item.quantity || '');
+
                 // Staggered animation delay
                 tr.style.animation = `fadeIn 0.3s ease forwards ${index * 0.02}s`;
                 tr.style.opacity = '0';
