@@ -48,37 +48,71 @@ document.addEventListener('DOMContentLoaded', () => {
     if (downloadCsvBtn) {
         downloadCsvBtn.addEventListener('click', () => {
             const cheaperRows = document.querySelectorAll('tr.row-cheaper');
-            const partsMap = {};
+            const partsMapBS = {};
+            const partsMapS = {};
 
             for (const row of cheaperRows) {
                 const elementId = row.getAttribute('data-cheapest-element-id');
+                const channel = row.getAttribute('data-cheapest-channel');
                 // The quantity is the 3rd cell (index 2)
                 const quantityText = row.children[2].textContent;
                 const quantity = parseInt(quantityText) || 0;
                 
                 if (elementId && quantity > 0) {
-                    if (partsMap[elementId]) {
-                        partsMap[elementId] += quantity;
-                    } else {
-                        partsMap[elementId] = quantity;
+                    if (channel === 'pab') { // Bestseller
+                        partsMapBS[elementId] = (partsMapBS[elementId] || 0) + quantity;
+                    } else { // Standard (bap or other)
+                        partsMapS[elementId] = (partsMapS[elementId] || 0) + quantity;
                     }
                 }
             }
 
-            let csvContent = "elementId,quantity\r\n";
-            for (const [elId, qty] of Object.entries(partsMap)) {
-                csvContent += `${elId},${qty}\r\n`;
-            }
+            const bsEntries = Object.entries(partsMapBS).map(([id, qty]) => ({id, qty}));
+            const sEntries = Object.entries(partsMapS).map(([id, qty]) => ({id, qty}));
 
-            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.setAttribute('href', url);
-            a.setAttribute('download', 'pick_a_brick_recommendations.csv');
-            a.style.display = 'none';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
+            const numBsChunks = Math.ceil(bsEntries.length / 200) || 1;
+            const numSChunks = Math.ceil(sEntries.length / 200) || 1;
+            const maxChunks = Math.max(numBsChunks, numSChunks);
+
+            const chunkArray = (arr, numChunks) => {
+                if (numChunks <= 1) return [arr];
+                const chunkSize = Math.ceil(arr.length / numChunks);
+                const chunks = [];
+                for (let i = 0; i < numChunks; i++) {
+                    chunks.push(arr.slice(i * chunkSize, (i + 1) * chunkSize));
+                }
+                return chunks;
+            };
+
+            const bsChunks = chunkArray(bsEntries, numBsChunks);
+            const sChunks = chunkArray(sEntries, numSChunks);
+
+            for (let i = 0; i < maxChunks; i++) {
+                let csvContent = "elementId,quantity\r\n";
+                const currentBs = bsChunks[i] || [];
+                const currentS = sChunks[i] || [];
+                
+                for (const entry of currentBs) {
+                    csvContent += `${entry.id},${entry.qty}\r\n`;
+                }
+                for (const entry of currentS) {
+                    csvContent += `${entry.id},${entry.qty}\r\n`;
+                }
+
+                // Skip downloading if chunk is completely empty (can happen if no recommendations at all)
+                if (currentBs.length === 0 && currentS.length === 0) continue;
+
+                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.setAttribute('href', url);
+                const suffix = maxChunks > 1 ? `_${i + 1}` : '';
+                a.setAttribute('download', `pick_a_brick_recommendations${suffix}.csv`);
+                a.style.display = 'none';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            }
         });
     }
 
@@ -308,6 +342,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                         } else {
                                             let lowestLegoPrice = Infinity;
                                             let cheapestElementId = null;
+                                            let cheapestChannel = null;
                                             legoPriceTd.innerHTML = finalResults.map(res => {
                                                 const formattedPrice = res.price?.formattedAmount || 'N/A';
                                                 
@@ -315,6 +350,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                                 if (parsedPrice !== null && parsedPrice < lowestLegoPrice) {
                                                     lowestLegoPrice = parsedPrice;
                                                     cheapestElementId = res.id;
+                                                    cheapestChannel = res.deliveryChannel;
                                                 }
 
                                                 let channelStr = 'XX';
@@ -331,6 +367,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                             
                                             if (lowestLegoPrice !== Infinity && pricePerFloat !== null && lowestLegoPrice < pricePerFloat) {
                                                 tr.setAttribute('data-cheapest-element-id', cheapestElementId);
+                                                tr.setAttribute('data-cheapest-channel', cheapestChannel || '');
                                                 if (!tr.classList.contains('row-cheaper')) {
                                                     tr.classList.add('row-cheaper');
                                                     recommendationsCount++;
