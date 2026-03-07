@@ -32,15 +32,26 @@ document.addEventListener('DOMContentLoaded', () => {
             const buttons = document.querySelectorAll('.search-lego-price-btn');
             getAllLegoPricesBtn.disabled = true;
             getAllLegoPricesBtn.textContent = 'Fetching...';
+            let rateLimitHit = false;
             for (const btn of buttons) {
                 // If it's already disabled, it means we clicked it or it's currently fetching
                 if (!btn.disabled && btn.fetchLegoPrice) {
-                    await btn.fetchLegoPrice();
+                    const success = await btn.fetchLegoPrice();
+                    if (success === false) {
+                        rateLimitHit = true;
+                        break;
+                    }
                     // Small delay to prevent rate limiting
-                    await new Promise(r => setTimeout(r, 600));
+                    await new Promise(r => setTimeout(r, 1000));
                 }
             }
-            getAllLegoPricesBtn.textContent = 'Done!';
+            if (rateLimitHit) {
+                getAllLegoPricesBtn.textContent = 'Get All LEGO Prices';
+                getAllLegoPricesBtn.disabled = false;
+                alert('Rate limit reached (429). Batch paused. Please wait a moment and click again to continue.');
+            } else {
+                getAllLegoPricesBtn.textContent = 'Done!';
+            }
         });
     }
 
@@ -334,54 +345,126 @@ document.addEventListener('DOMContentLoaded', () => {
                                                 const res = await getLegoStoreResult(elId);
                                                 if (res) finalResults.push(res);
                                             } catch (e) {
+                                                if (e.message === 'RATE_LIMIT_429') throw e;
                                                 console.error('Error fetching lego store result for', elId, e);
                                             }
                                         }
                                         if (finalResults.length === 0) {
                                             legoPriceTd.textContent = 'Not Available';
-                                        } else {
-                                            let lowestLegoPrice = Infinity;
-                                            let cheapestElementId = null;
-                                            let cheapestChannel = null;
-                                            legoPriceTd.innerHTML = finalResults.map(res => {
-                                                const formattedPrice = res.price?.formattedAmount || 'N/A';
-                                                
-                                                const parsedPrice = extractPrice(formattedPrice);
-                                                if (parsedPrice !== null && parsedPrice < lowestLegoPrice) {
-                                                    lowestLegoPrice = parsedPrice;
-                                                    cheapestElementId = res.id;
-                                                    cheapestChannel = res.deliveryChannel;
-                                                }
+                                        } else if (finalResults.length === 1) {
+                                            const res = finalResults[0];
+                                            const formattedPrice = res.price?.formattedAmount || 'N/A';
+                                            const parsedPrice = extractPrice(formattedPrice);
+                                            
+                                            let channelStr = 'XX';
+                                            if (res.deliveryChannel === 'pab') channelStr = 'BS';
+                                            else if (res.deliveryChannel === 'bap') channelStr = 'S';
+                                            const elementIdStr = escapeHTML(String(res.id));
+                                            const link = `<a href="https://www.lego.com/en-us/pick-and-build/pick-a-brick?query=${elementIdStr}" target="_blank" style="color: #60a5fa; text-decoration: none;">${elementIdStr}</a>`;
+                                            legoPriceTd.innerHTML = `${link} - ${escapeHTML(String(formattedPrice))} - ${channelStr}`;
 
-                                                let channelStr = 'XX';
-                                                if (res.deliveryChannel === 'pab') channelStr = 'BS';
-                                                else if (res.deliveryChannel === 'bap') channelStr = 'S';
-                                                const elementIdStr = escapeHTML(String(res.id));
-                                                const link = `<a href="https://www.lego.com/en-us/pick-and-build/pick-a-brick?query=${elementIdStr}" target="_blank" style="color: #60a5fa; text-decoration: none;">${elementIdStr}</a>`;
-                                                return `${link} - ${escapeHTML(String(formattedPrice))} - ${channelStr}`;
-                                            }).join('<br>');
-
-                                            // Compare and highlight if cheaper
                                             const pricePerStr = tr.querySelector('.item-price').textContent;
                                             const pricePerFloat = extractPrice(pricePerStr);
                                             
-                                            if (lowestLegoPrice !== Infinity && pricePerFloat !== null && lowestLegoPrice < pricePerFloat) {
-                                                tr.setAttribute('data-cheapest-element-id', cheapestElementId);
-                                                tr.setAttribute('data-cheapest-channel', cheapestChannel || '');
+                                            if (parsedPrice !== null && pricePerFloat !== null && parsedPrice < pricePerFloat) {
+                                                tr.setAttribute('data-cheapest-element-id', res.id);
+                                                tr.setAttribute('data-cheapest-channel', res.deliveryChannel || '');
                                                 if (!tr.classList.contains('row-cheaper')) {
                                                     tr.classList.add('row-cheaper');
                                                     recommendationsCount++;
                                                     statRecommendations.textContent = recommendationsCount;
                                                 }
                                             }
+                                        } else {
+                                            // Handle multiple matches
+                                            tr.classList.add('row-error');
+                                            issuesCount++;
+                                            statIssues.textContent = issuesCount;
+                                            
+                                            let isCurrentlyIssue = true;
+                                            let isCurrentlyCheaper = false;
+                                            const radioGroupName = `pab-select-${data.itemNo}-${Math.random().toString(36).substr(2, 9)}`;
+                                            const container = document.createElement('div');
+                                            container.style.display = 'flex';
+                                            container.style.flexDirection = 'column';
+                                            container.style.gap = '4px';
+
+                                            const pricePerStr = tr.querySelector('.item-price').textContent;
+                                            const pricePerFloat = extractPrice(pricePerStr);
+
+                                            finalResults.forEach(res => {
+                                                const formattedPrice = res.price?.formattedAmount || 'N/A';
+                                                const parsedPrice = extractPrice(formattedPrice);
+                                                
+                                                let channelStr = 'XX';
+                                                if (res.deliveryChannel === 'pab') channelStr = 'BS';
+                                                else if (res.deliveryChannel === 'bap') channelStr = 'S';
+                                                const elementIdStr = escapeHTML(String(res.id));
+                                                const link = `<a href="https://www.lego.com/en-us/pick-and-build/pick-a-brick?query=${elementIdStr}" target="_blank" style="color: #60a5fa; text-decoration: none;">${elementIdStr}</a>`;
+                                                
+                                                const label = document.createElement('label');
+                                                label.style.display = 'flex';
+                                                label.style.alignItems = 'center';
+                                                label.style.gap = '8px';
+                                                label.style.cursor = 'pointer';
+                                                
+                                                const radio = document.createElement('input');
+                                                radio.type = 'radio';
+                                                radio.name = radioGroupName;
+                                                radio.value = res.id;
+                                                
+                                                radio.addEventListener('change', () => {
+                                                    if (isCurrentlyIssue) {
+                                                        isCurrentlyIssue = false;
+                                                        tr.classList.remove('row-error');
+                                                        issuesCount--;
+                                                        statIssues.textContent = issuesCount;
+                                                    }
+                                                    
+                                                    tr.setAttribute('data-cheapest-element-id', res.id);
+                                                    tr.setAttribute('data-cheapest-channel', res.deliveryChannel || '');
+                                                    
+                                                    if (parsedPrice !== null && pricePerFloat !== null && parsedPrice < pricePerFloat) {
+                                                        if (!isCurrentlyCheaper) {
+                                                            isCurrentlyCheaper = true;
+                                                            tr.classList.add('row-cheaper');
+                                                            recommendationsCount++;
+                                                            statRecommendations.textContent = recommendationsCount;
+                                                        }
+                                                    } else {
+                                                        if (isCurrentlyCheaper) {
+                                                            isCurrentlyCheaper = false;
+                                                            tr.classList.remove('row-cheaper');
+                                                            recommendationsCount--;
+                                                            statRecommendations.textContent = recommendationsCount;
+                                                        }
+                                                    }
+                                                });
+                                                
+                                                const textSpan = document.createElement('span');
+                                                textSpan.innerHTML = `${link} - ${escapeHTML(String(formattedPrice))} - ${channelStr}`;
+                                                
+                                                label.appendChild(radio);
+                                                label.appendChild(textSpan);
+                                                container.appendChild(label);
+                                            });
+                                            legoPriceTd.innerHTML = '';
+                                            legoPriceTd.appendChild(container);
                                         }
                                     } else {
                                         legoPriceTd.textContent = 'None';
                                     }
                                 } catch (e) {
+                                    if (e.message === 'RATE_LIMIT_429') {
+                                        console.warn('Rate limit hit inside Search button');
+                                        btn.textContent = 'Search';
+                                        btn.disabled = false;
+                                        return false;
+                                    }
                                     console.error('Error', e);
                                     legoPriceTd.textContent = 'Error';
                                 }
+                                return true;
                             };
                             btn.onclick = btn.fetchLegoPrice;
                             legoPriceTd.appendChild(btn);
@@ -440,6 +523,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const bricklinkUrl = `https://www.bricklink.com/catalogColors.asp?itemType=P&itemNo=${designId}`;
             const url = `https://corsproxy.io/?${encodeURIComponent(bricklinkUrl)}`;
             const response = await fetch(url);
+            if (response.status === 429) {
+                throw new Error('RATE_LIMIT_429');
+            }
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
@@ -518,6 +604,10 @@ fragment ElementLeaf on SearchResultElement {
                 },
                 body: JSON.stringify(jsonBody)
             });
+            
+            if (response.status === 429) {
+                throw new Error('RATE_LIMIT_429');
+            }
             
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
